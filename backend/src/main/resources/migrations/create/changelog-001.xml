@@ -1,0 +1,58 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<databaseChangeLog
+        xmlns="http://www.liquibase.org/xml/ns/dbchangelog"
+        xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+        xsi:schemaLocation="http://www.liquibase.org/xml/ns/dbchangelog
+                      http://www.liquibase.org/xml/ns/dbchangelog/dbchangelog-4.27.xsd"
+        objectQuotingStrategy="QUOTE_ONLY_RESERVED_WORDS">
+    <changeSet id="1" author="create-db">
+        <createTable tableName="user_session">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_user_session"/>
+            </column>
+            <column name="refresh_token" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="device_info" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="user_id" type="UUID"/>
+            <column name="created_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+            <column name="expires_at" type="DATETIME">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="2" author="create-db">
+        <createTable tableName="user_table">
+            <column name="id" type="UUID">
+                <constraints nullable="false" primaryKey="true" primaryKeyName="pk_user_table"/>
+            </column>
+            <column name="login" type="VARCHAR(255)">
+                <constraints nullable="false"/>
+            </column>
+            <column name="password" type="TEXT">
+                <constraints nullable="false"/>
+            </column>
+        </createTable>
+    </changeSet>
+
+    <changeSet id="3" author="create-db">
+        <addUniqueConstraint columnNames="refresh_token" constraintName="uc_user_session_refreshtoken"
+                             tableName="user_session"/>
+    </changeSet>
+
+    <changeSet id="4" author="create-db">
+        <addUniqueConstraint columnNames="login" constraintName="uc_user_table_login" tableName="user_table"/>
+    </changeSet>
+
+    <changeSet id="5" author="create-db">
+        <addForeignKeyConstraint baseColumnNames="user_id" baseTableName="user_session"
+                                 constraintName="FK_USER_SESSION_ON_USER" referencedColumnNames="id"
+                                 referencedTableName="user_table"/>
+    </changeSet>
+
+</databaseChangeLog>
