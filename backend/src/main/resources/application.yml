@@ -14,7 +14,7 @@ spring:
   jpa:
     hibernate:
       ddl-auto: update  # Для локальной разработки, в Docker используем Flyway
-    show-sql: true
+    show-sql: false
     properties:
       hibernate:
         format_sql: true
