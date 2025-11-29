@@ -8,6 +8,7 @@ import ru.tenderhack.cte.entity.GroupingTaskEntity;
 import ru.tenderhack.cte.entity.Status;
 import ru.tenderhack.cte.exception.ResourceNotFoundException;
 import ru.tenderhack.cte.repository.GroupingTaskRepository;
+import ru.tenderhack.cte.service.GroupingService;
 import ru.tenderhack.cte.service.LlmClientService;
 
 import java.util.*;
@@ -23,6 +24,7 @@ public class GroupingFacadeStub implements GroupingFacade {
 
     private final GroupingTaskRepository taskRepository;
     private final LlmClientService llmClientService;
+    private final GroupingService groupingService;
 
     // Хранилище stub-данных
     private static final Map<UUID, List<CteSummary>> TASK_CTE_MAP = new HashMap<>();
@@ -41,6 +43,7 @@ public class GroupingFacadeStub implements GroupingFacade {
 
         // Генерируем stub-данные СТЕ
         generateStubCtes(task.getId());
+        groupingService.startGroupingTask(task.getId(), query);
 
         log.info("Created task with ID: {}", task.getId());
         return new TaskResponse(task.getId());

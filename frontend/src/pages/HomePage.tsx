@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import { useRequestGroupingMutation } from '../store/groupingApi';
@@ -14,15 +14,20 @@ const HomePage = () => {
   const dispatch = useAppDispatch();
   const [requestGrouping] = useRequestGroupingMutation();
 
-  // Очистка WebSocket при размонтировании
+  // Реф для отслеживания монтирования компонента, чтобы избежать утечек памяти
+  const isMounted = useRef(true);
+
   useEffect(() => {
+    isMounted.current = true;
     return () => {
+      isMounted.current = false;
       websocketService.disconnect();
     };
   }, []);
 
   const fetchResultsAndNavigate = async (taskId: string) => {
     try {
+      // Запускаем получение данных
       const resultsQuery = dispatch(groupingApi.endpoints.getResults.initiate(taskId));
       const filtersQuery = dispatch(groupingApi.endpoints.getFilters.initiate(taskId));
 
@@ -31,11 +36,15 @@ const HomePage = () => {
         filtersQuery.unwrap(),
       ]);
 
-      navigate(`/catalog?taskId=${taskId}`);
+      if (isMounted.current) {
+        navigate(`/catalog?taskId=${taskId}`);
+      }
     } catch (err: any) {
       console.error('Error fetching results:', err);
-      setError('Ошибка при получении данных. Попробуйте еще раз.');
-      setIsLoading(false);
+      if (isMounted.current) {
+        setError('Ошибка при получении данных. Попробуйте еще раз.');
+        setIsLoading(false);
+      }
     }
   };
 
@@ -56,31 +65,33 @@ const HomePage = () => {
       const result = await requestGrouping({ query: query.trim() }).unwrap();
       const taskId = result.taskId;
 
-      // 2. Подключаемся к WebSocket (просто чтобы слушать, если вдруг что-то придет)
+      // 2. Подключаемся к WebSocket и ждем завершения
       websocketService.connect(
           taskId,
-          () => {
-            // Этот callback сработает, если сервер сам закроет соединение раньше 5 сек.
-            // Можно оставить пустым или продублировать логику, но с защитой от двойного вызова.
-            console.log("Server completed task early");
+          // Callback успешного завершения (onComplete/onMessage)
+          async () => {
+            console.log("WebSocket: Задача завершена, загружаем результаты...");
+            await fetchResultsAndNavigate(taskId);
           },
+          // Callback ошибки (onError)
           (wsError) => {
             console.error('WebSocket error:', wsError);
-            // Не блокируем работу ошибкой сокета, так как у нас есть таймер
+            if (isMounted.current) {
+                // Можно либо показать ошибку, либо попробовать загрузить данные все равно,
+                // если WS упал, но данные могли быть готовы.
+                // В данном случае просто показываем ошибку:
+                setError('Ошибка соединения с сервером уведомлений.');
+                setIsLoading(false);
+            }
           }
       );
 
-      // 3. НАСИЛЬНОЕ ОТКЛЮЧЕНИЕ через 5 секунд
-      setTimeout(async () => {
-        console.log("Force disconnecting WebSocket after 5 seconds...");
-        websocketService.disconnect(); // Отрубаем сокет
-        await fetchResultsAndNavigate(taskId); // Идем за данными
-      }, 5000);
-
     } catch (err: any) {
       console.error('Error requesting grouping:', err);
-      setError(err.data?.message || 'Ошибка при отправке запроса. Попробуйте еще раз.');
-      setIsLoading(false);
+      if (isMounted.current) {
+        setError(err.data?.message || 'Ошибка при отправке запроса. Попробуйте еще раз.');
+        setIsLoading(false);
+      }
     }
   };
 
