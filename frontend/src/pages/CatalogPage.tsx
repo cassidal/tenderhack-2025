@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import Header from '../components/Header';
 import {
   useGetResultsQuery,
   useGetFiltersQuery,
@@ -190,7 +189,6 @@ const CatalogPage = () => {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      <Header />
 
       <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white py-8 px-6">
         <div className="max-w-7xl mx-auto">
