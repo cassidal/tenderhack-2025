@@ -37,6 +37,7 @@ public class GroupingPipelineService {
     private final OllamaService ollamaService;
     private final DynamicParserEngine parserEngine;
     private final CteMapper cteMapper;
+    private final NotificationService notificationService;
 
     /**
      * Запускает полный pipeline обработки группировки асинхронно
@@ -421,6 +422,7 @@ public class GroupingPipelineService {
                 .orElseThrow(() -> new ResourceNotFoundException("Task not found: " + taskId));
         task.setStatus(status);
         taskRepository.save(task);
+        notificationService.notifyTaskStatus(taskId, status, "Changed status of task " + taskId + " to " + status);
         log.info("Updated task {} status to {}", taskId, status);
     }
 }

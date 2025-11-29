@@ -4,8 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
-import ru.tenderhack.cte.dto.TaskStatus;
 import ru.tenderhack.cte.dto.TaskStatusEvent;
+import ru.tenderhack.cte.entity.Status;
 
 import java.time.Instant;
 import java.util.UUID;
@@ -20,7 +20,7 @@ public class NotificationService {
     /**
      * Отправляет обновление статуса в топик /topic/tasks/{taskId}/status
      */
-    public void notifyTaskStatus(UUID taskId, TaskStatus status, String message) {
+    public void notifyTaskStatus(UUID taskId, Status status, String message) {
         String destination = "/topic/tasks/" + taskId + "/status";
 
         TaskStatusEvent event = new TaskStatusEvent(

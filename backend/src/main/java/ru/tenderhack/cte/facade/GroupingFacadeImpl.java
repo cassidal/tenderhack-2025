@@ -2,6 +2,7 @@ package ru.tenderhack.cte.facade;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.context.annotation.Primary;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -25,7 +26,7 @@ import java.util.concurrent.CompletableFuture;
  */
 @Slf4j
 @Service
-@org.springframework.context.annotation.Primary
+@Primary
 @RequiredArgsConstructor
 public class GroupingFacadeImpl implements GroupingFacade {
 
