@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  # Сервис базы данных
+  db:
+    image: postgres:15-alpine
+    container_name: tenderhack_db
+    restart: always
+    environment:
+      POSTGRES_DB: tenderhack
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432" # Проброс порта наружу, чтобы подключаться через DBeaver/IntelliJ
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Ваше Spring Boot приложение
+  backend:
+    build: .
+    container_name: tenderhack_backend
+    restart: on-failure
+    ports:
+      - "8080:8080"
+    depends_on:
+      db:
+        condition: service_healthy # Ждем, пока БД полностью запустится
+    environment:
+      # ПЕРЕОПРЕДЕЛЯЕМ настройки из application.properties для Docker сети:
+
+      # 1. Указываем хост 'db' вместо 'localhost'
+      SPRING_DATASOURCE_URL: jdbc:postgresql://db:5432/tenderhack
+
+      # 2. Явно указываем креды (на всякий случай, хотя они совпадают с properties)
+      SPRING_DATASOURCE_USERNAME: postgres
+      SPRING_DATASOURCE_PASSWORD: postgres
+
+      # 3. (Опционально) Если нужно, чтобы JWT issuer оставался localhost для внешнего мира
+      # SERVER_DOMAIN: localhost
+
+volumes:
+  postgres_data:
