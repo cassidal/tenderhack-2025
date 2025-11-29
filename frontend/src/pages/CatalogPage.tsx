@@ -1,219 +1,197 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
+import { useSearchParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
-
-interface Category {
-  id: string;
-  name: string;
-  subcategories?: Category[];
-}
-
-interface Product {
-  id: number;
-  name: string;
-  brand: string;
-  image: string;
-  categoryId: string;
-  subcategoryId: string;
-  hasOffer?: boolean;
-  isInDemand?: boolean;
-  tags?: string[];
-}
+import {
+  useGetResultsQuery,
+  useGetFiltersQuery,
+  useRegenerateMutation,
+  useApproveMutation,
+  useRateMutation,
+} from '../store/groupingApi';
+import { websocketService } from '../services/websocket';
+import { useAppDispatch } from '../store/hooks';
+import { groupingApi } from '../store/groupingApi';
+import type { ProductCard, FilterOption } from '../store/groupingApi';
 
 const CatalogPage = () => {
-  const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
-  const [selectedSubcategory, setSelectedSubcategory] = useState<string | null>(null);
-  const [hasOffers, setHasOffers] = useState(false);
-  const [isInDemand, setIsInDemand] = useState(false);
+  const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const dispatch = useAppDispatch();
+  const taskId = searchParams.get('taskId');
+
+  const [showRegenerateModal, setShowRegenerateModal] = useState(false);
+  const [regenerateQuery, setRegenerateQuery] = useState('');
+  const [isRegenerating, setIsRegenerating] = useState(false);
+  const [rating, setRating] = useState(3);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedFilters, setSelectedFilters] = useState<Record<string, string[]>>({});
   const [searchQuery, setSearchQuery] = useState('');
 
-  const categories: Category[] = [
-    {
-      id: 'electronics',
-      name: 'Электроника',
-      subcategories: [
-        { id: 'phones', name: 'Телефоны' },
-        { id: 'laptops', name: 'Ноутбуки' },
-        { id: 'tablets', name: 'Планшеты' },
-        { id: 'computers', name: 'Компьютеры' },
-      ],
-    },
-    {
-      id: 'furniture',
-      name: 'Мебель',
-      subcategories: [
-        { id: 'office', name: 'Офисная мебель' },
-        { id: 'home', name: 'Домашняя мебель' },
-        { id: 'chairs', name: 'Стулья' },
-      ],
-    },
-    {
-      id: 'office',
-      name: 'Канцелярские товары',
-      subcategories: [
-        { id: 'paper', name: 'Бумага' },
-        { id: 'pens', name: 'Ручки' },
-        { id: 'folders', name: 'Папки' },
-        { id: 'rulers', name: 'Линейки' },
-      ],
-    },
-    {
-      id: 'equipment',
-      name: 'Оборудование',
-      subcategories: [
-        { id: 'printers', name: 'Принтеры' },
-        { id: 'scanners', name: 'Сканеры' },
-        { id: 'projectors', name: 'Проекторы' },
-      ],
-    },
-  ];
+  // Загружаем данные если есть taskId
+  const { data: resultsData, isLoading: isLoadingResults, error: resultsError } = useGetResultsQuery(
+    taskId || '',
+    { skip: !taskId }
+  );
+  const { data: filtersData, isLoading: isLoadingFilters } = useGetFiltersQuery(
+    taskId || '',
+    { skip: !taskId }
+  );
 
-  const currentCategory = categories.find(cat => cat.id === selectedCategory);
-  const subcategories = currentCategory?.subcategories || [];
+  const [regenerate] = useRegenerateMutation();
+  const [approve] = useApproveMutation();
+  const [rate] = useRateMutation();
 
-  const products: Product[] = [
-    {
-      id: 1,
-      name: 'Линейка деревянная 30 см',
-      brand: 'OfficePro',
-      image: '📏',
-      categoryId: 'office',
-      subcategoryId: 'rulers',
-      hasOffer: true,
-      isInDemand: true,
-      tags: ['линейка', 'деревянная', '30 см', 'скидка'],
-    },
-    {
-      id: 2,
-      name: 'Линейка пластиковая 50 см усиленная',
-      brand: 'SmartLine',
-      image: '📏',
-      categoryId: 'office',
-      subcategoryId: 'rulers',
-      hasOffer: true,
-      tags: ['линейка', 'пластиковая', '50 см', 'скидка'],
-    },
-    {
-      id: 3,
-      name: 'Линейка металлическая 1 метр',
-      brand: 'ProMeasure',
-      image: '📏',
-      categoryId: 'office',
-      subcategoryId: 'rulers',
-      isInDemand: true,
-      tags: ['линейка', 'металлическая', '1 метр'],
-    },
-    {
-      id: 4,
-      name: 'Линейка гибкая прозрачная 20 см',
-      brand: 'Flexi',
-      image: '📏',
-      categoryId: 'office',
-      subcategoryId: 'rulers',
-      tags: ['линейка', 'гибкая', 'прозрачная'],
-    },
-    {
-      id: 5,
-      name: 'Линейка алюминиевая с антискользящим покрытием',
-      brand: 'MeasureX',
-      image: '📏',
-      categoryId: 'office',
-      subcategoryId: 'rulers',
-      hasOffer: true,
-      tags: ['линейка', 'алюминиевая', 'скидка'],
-    },
-    {
-      id: 6,
-      name: 'Смартфон SmartOne X',
-      brand: 'SmartOne',
-      image: '📱',
-      categoryId: 'electronics',
-      subcategoryId: 'phones',
-      isInDemand: true,
-      tags: ['телефон', 'смартфон'],
-    },
-    {
-      id: 7,
-      name: 'Ноутбук UltraBook Pro 15',
-      brand: 'UltraTech',
-      image: '💻',
-      categoryId: 'electronics',
-      subcategoryId: 'laptops',
-      tags: ['ноутбук'],
-    },
-    {
-      id: 8,
-      name: 'Планшет VisionTab S',
-      brand: 'Vision',
-      image: '📱',
-      categoryId: 'electronics',
-      subcategoryId: 'tablets',
-      hasOffer: true,
-      tags: ['планшет', 'скидка'],
-    },
-    {
-      id: 9,
-      name: 'Компьютер Monoblock 24"',
-      brand: 'MonoTech',
-      image: '🖥️',
-      categoryId: 'electronics',
-      subcategoryId: 'computers',
-      tags: ['компьютер'],
-    },
-    {
-      id: 10,
-      name: 'Стул офисный эргономичный',
-      brand: 'Comfort',
-      image: '🪑',
-      categoryId: 'furniture',
-      subcategoryId: 'office',
-      tags: ['мебель', 'стул'],
-    },
-    {
-      id: 11,
-      name: 'Принтер лазерный LaserJet 4000',
-      brand: 'Printo',
-      image: '🖨️',
-      categoryId: 'equipment',
-      subcategoryId: 'printers',
-      tags: ['принтер'],
-    },
-    {
-      id: 12,
-      name: 'Сканер документов ScanPro',
-      brand: 'ScanPro',
-      image: '🖨️',
-      categoryId: 'equipment',
-      subcategoryId: 'scanners',
-      tags: ['сканер'],
-    },
-  ];
+  // Редирект на главную если нет taskId
+  useEffect(() => {
+    if (!taskId) {
+      navigate('/');
+    }
+  }, [taskId, navigate]);
 
-  const normalizedQuery = searchQuery.trim().toLowerCase();
-  const filteredProducts = products.filter((product) => {
-    const matchesSearch = normalizedQuery
-      ? product.name.toLowerCase().includes(normalizedQuery) ||
-        product.tags?.some((tag) => tag.toLowerCase().includes(normalizedQuery))
-      : true;
-    const matchesCategory = selectedCategory ? product.categoryId === selectedCategory : true;
-    const matchesSubcategory = selectedSubcategory ? product.subcategoryId === selectedSubcategory : true;
-    const matchesOffers = hasOffers ? product.hasOffer : true;
-    const matchesDemand = isInDemand ? product.isInDemand : true;
+  // Очистка WebSocket при размонтировании
+  useEffect(() => {
+    return () => {
+      websocketService.disconnect();
+    };
+  }, []);
 
-    return matchesSearch && matchesCategory && matchesSubcategory && matchesOffers && matchesDemand;
+  const handleRegenerate = async () => {
+    if (!taskId || !regenerateQuery.trim()) return;
+
+    setIsRegenerating(true);
+    setShowRegenerateModal(false);
+
+    websocketService.disconnect();
+
+    try {
+      const result = await regenerate({
+        taskId,
+        body: { query: regenerateQuery.trim() },
+      }).unwrap();
+
+      const newTaskId = result.taskId;
+
+      // Функция для получения данных (вынесли, чтобы вызывать из двух мест)
+      const fetchNewData = async () => {
+        try {
+          // Запускаем запросы (без await Promise.all, чтобы получить объекты)
+          const resultsQuery = dispatch(groupingApi.endpoints.getResults.initiate(newTaskId));
+          const filtersQuery = dispatch(groupingApi.endpoints.getFilters.initiate(newTaskId));
+
+          // Ждем реальные промисы
+          await Promise.all([
+            resultsQuery.unwrap(),
+            filtersQuery.unwrap(),
+          ]);
+
+          navigate(`/catalog?taskId=${newTaskId}`, { replace: true });
+          setRegenerateQuery('');
+          // Важно: выключаем загрузку
+          setIsRegenerating(false);
+        } catch (err) {
+          console.error('Error fetching regenerated results:', err);
+          setIsRegenerating(false);
+        }
+      };
+
+      // Подключаемся (слушаем, вдруг повезет и сообщение придет)
+      websocketService.connect(
+          newTaskId,
+          () => {
+            console.log("Server finished regeneration early");
+            // Можно вызвать fetchNewData(), но нужно защититься от двойного вызова
+          },
+          (wsError) => {
+            console.error('WebSocket error during regeneration:', wsError);
+            // Не выключаем загрузку здесь, ждем таймер
+          }
+      );
+
+      // ПРИНУДИТЕЛЬНОЕ ЗАВЕРШЕНИЕ ЧЕРЕЗ 5 СЕКУНД
+      setTimeout(async () => {
+        console.log("Force finishing regeneration after 5s...");
+        websocketService.disconnect();
+        await fetchNewData();
+      }, 5000);
+
+    } catch (err: any) {
+      console.error('Error regenerating:', err);
+      setIsRegenerating(false);
+    }
+  };
+
+
+  const handleApprove = async () => {
+    if (!taskId) return;
+
+    try {
+      await approve(taskId).unwrap();
+      alert('Данные успешно подтверждены!');
+    } catch (err: any) {
+      console.error('Error approving:', err);
+      alert('Ошибка при подтверждении данных');
+    }
+  };
+
+  const handleRate = async () => {
+    if (!taskId) return;
+
+    try {
+      await rate({ taskId, body: { rating } }).unwrap();
+      alert('Оценка успешно отправлена!');
+      setShowRatingModal(false);
+    } catch (err: any) {
+      console.error('Error rating:', err);
+      alert('Ошибка при отправке оценки');
+    }
+  };
+
+  const handleFilterChange = (filterId: string, value: string) => {
+    setSelectedFilters((prev) => {
+      const currentValues = prev[filterId] || [];
+      const newValues = currentValues.includes(value)
+        ? currentValues.filter((v) => v !== value)
+        : [...currentValues, value];
+      return { ...prev, [filterId]: newValues };
+    });
+  };
+
+  const cards = resultsData?.cards || [];
+  const filters = filtersData?.filters || [];
+
+  // Фильтрация карточек
+  const filteredCards = cards.filter((card) => {
+    // Фильтр по поисковому запросу
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase();
+      const matchesSearch =
+        card.name?.toLowerCase().includes(query) ||
+        card.description?.toLowerCase().includes(query);
+      if (!matchesSearch) return false;
+    }
+
+    // Фильтр по выбранным фильтрам
+    for (const [filterId, selectedValues] of Object.entries(selectedFilters)) {
+      if (selectedValues.length > 0) {
+        // Проверяем, есть ли у карточки свойство, соответствующее фильтру
+        const cardValue = card[filterId];
+        if (cardValue && !selectedValues.includes(String(cardValue))) {
+          return false;
+        }
+      }
+    }
+
+    return true;
   });
 
-  const resetFilters = () => {
-    setSelectedCategory(null);
-    setSelectedSubcategory(null);
-    setHasOffers(false);
-    setIsInDemand(false);
-    setSearchQuery('');
-  };
+  if (!taskId) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
-      
+
       <div className="bg-gradient-to-br from-blue-600 to-blue-700 text-white py-8 px-6">
         <div className="max-w-7xl mx-auto">
           <h1 className="text-3xl font-bold mb-2">ПОРТАЛ ПОСТАВЩИКОВ</h1>
@@ -222,272 +200,274 @@ const CatalogPage = () => {
       </div>
 
       <div className="max-w-7xl mx-auto px-6 py-6">
-        <div className="bg-white rounded-lg shadow-sm p-6 mb-6">
-          <div className="flex flex-col md:flex-row gap-4 items-center">
-            <button className="px-4 py-3 bg-gray-100 rounded-lg flex items-center gap-2 hover:bg-gray-200 transition-colors border-none cursor-pointer">
-              <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                <rect x="2" y="2" width="4" height="4" fill="currentColor"/>
-                <rect x="8" y="2" width="4" height="4" fill="currentColor"/>
-                <rect x="14" y="2" width="4" height="4" fill="currentColor"/>
-                <rect x="2" y="8" width="4" height="4" fill="currentColor"/>
-                <rect x="8" y="8" width="4" height="4" fill="currentColor"/>
-                <rect x="14" y="8" width="4" height="4" fill="currentColor"/>
-                <rect x="2" y="14" width="4" height="4" fill="currentColor"/>
-                <rect x="8" y="14" width="4" height="4" fill="currentColor"/>
-                <rect x="14" y="14" width="4" height="4" fill="currentColor"/>
+        {/* Действия */}
+        <div className="bg-white rounded-lg shadow-sm p-6 mb-6 flex flex-wrap gap-4 items-center justify-between">
+          <div className="flex gap-4 flex-wrap">
+            <button
+              onClick={() => setShowRegenerateModal(true)}
+              disabled={isRegenerating}
+              className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed border-none cursor-pointer"
+            >
+              {isRegenerating ? 'Регенерация...' : 'Перегенерировать данные'}
+            </button>
+            <button
+              onClick={handleApprove}
+              className="px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors border-none cursor-pointer"
+            >
+              Подтвердить данные
+            </button>
+            <button
+              onClick={() => setShowRatingModal(true)}
+              className="px-6 py-3 bg-yellow-600 text-white rounded-lg hover:bg-yellow-700 transition-colors border-none cursor-pointer"
+            >
+              Поставить оценку
+            </button>
+          </div>
+          {isRegenerating && (
+            <div className="flex items-center gap-2 text-gray-600">
+              <svg className="animate-spin h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
               </svg>
-              <span className="font-medium">Каталог</span>
-            </button>
-            <div className="flex-1 flex items-center gap-2 bg-white border-2 border-gray-200 rounded-lg px-4 py-3 w-full">
-              <input
-                type="text"
-                placeholder="Введите название категории, товара или ID СТЕ"
-                className="flex-1 outline-none text-gray-700 placeholder-gray-400"
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-              />
-              <button className="p-2 text-gray-400 hover:text-gray-600 transition-colors border-none bg-transparent cursor-pointer">
-                <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                  <path d="M12 12L18 18M11 16C7.13401 16 4 12.866 4 9C4 5.13401 7.13401 2 11 2C14.866 2 18 5.13401 18 9C18 12.866 14.866 16 11 16Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-              </button>
-              <button className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors border-none cursor-pointer flex items-center gap-2">
-                <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                  <path d="M9 17C13.4183 17 17 13.4183 17 9C17 4.58172 13.4183 1 9 1C4.58172 1 1 4.58172 1 9C1 13.4183 4.58172 17 9 17Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                  <path d="M19 19L14.65 14.65" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                </svg>
-                <span>Найти</span>
-              </button>
+              <span>Идет регенерация данных...</span>
             </div>
-          </div>
-          <div className="flex gap-4 mt-4 text-sm flex-wrap">
-            <button
-              className={`transition-colors bg-transparent border-none cursor-pointer ${
-                hasOffers ? 'text-red-600 font-semibold' : 'text-blue-600 hover:text-blue-700'
-              }`}
-              onClick={() => setHasOffers((prev) => !prev)}
-            >
-              Есть предложения
-            </button>
-            <button
-              className={`transition-colors bg-transparent border-none cursor-pointer ${
-                searchQuery.toLowerCase() === 'скидка'
-                  ? 'text-red-600 font-semibold'
-                  : 'text-blue-600 hover:text-blue-700'
-              }`}
-              onClick={() => setSearchQuery('скидка')}
-            >
-              Товар со скидкой
-            </button>
-            <button
-              className={`transition-colors bg-transparent border-none cursor-pointer ${
-                isInDemand ? 'text-red-600 font-semibold' : 'text-blue-600 hover:text-blue-700'
-              }`}
-              onClick={() => setIsInDemand((prev) => !prev)}
-            >
-              Востребованный товар
-            </button>
-          </div>
+          )}
         </div>
 
         <div className="flex gap-6">
+          {/* Фильтры */}
           <aside className="w-64 flex-shrink-0">
-            <div className="bg-white rounded-lg shadow-sm p-4">
-              <h2 className="text-lg font-semibold mb-4 text-gray-800">Категории</h2>
-              <div className="space-y-2">
-                {categories.map((category) => (
-                  <div key={category.id}>
-                    <button
-                      className={`w-full text-left px-3 py-2 rounded-lg transition-colors flex items-center justify-between ${
-                        selectedCategory === category.id
-                          ? 'bg-blue-50 text-blue-600 font-medium'
-                          : 'text-gray-700 hover:bg-gray-50'
-                      }`}
-                      onClick={() => {
-                        setSelectedCategory(selectedCategory === category.id ? null : category.id);
-                        setSelectedSubcategory(null);
-                      }}
-                    >
-                      <span>{category.name}</span>
-                      {category.subcategories && (
-                        <svg
-                          className={`w-4 h-4 transition-transform ${
-                            selectedCategory === category.id ? 'rotate-180' : ''
-                          }`}
-                          fill="none"
-                          stroke="currentColor"
-                          viewBox="0 0 24 24"
-                        >
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                        </svg>
-                      )}
-                    </button>
-                    {selectedCategory === category.id && subcategories.length > 0 && (
-                      <div className="ml-4 mt-2 space-y-1">
-                        {subcategories.map((subcat) => (
-                          <button
-                            key={subcat.id}
-                            className={`w-full text-left px-3 py-2 rounded-lg transition-colors text-sm ${
-                              selectedSubcategory === subcat.id
-                                ? 'bg-blue-50 text-blue-600 font-medium'
-                                : 'text-gray-600 hover:bg-gray-50'
-                            }`}
-                            onClick={() => setSelectedSubcategory(subcat.id)}
-                          >
-                            {subcat.name}
-                          </button>
-                        ))}
-                      </div>
-                    )}
-                  </div>
-                ))}
+            <div className="bg-white rounded-lg shadow-sm p-4 sticky top-6">
+              <h2 className="text-lg font-semibold mb-4 text-gray-800">Фильтры</h2>
+
+              {/* Поиск */}
+              <div className="mb-6">
+                <input
+                  type="text"
+                  placeholder="Поиск по карточкам..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg outline-none focus:border-blue-500"
+                />
               </div>
 
-              <div className="mt-6 pt-6 border-t border-gray-200">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="text-base font-semibold text-gray-800">Фильтры (1)</h3>
-                  <button
-                    className="text-sm text-blue-600 hover:text-blue-700 bg-transparent border-none cursor-pointer"
-                    onClick={resetFilters}
-                  >
-                    Сбросить все
-                  </button>
-                </div>
-                
-                <div className="mb-4">
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Поиск категории портала
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      className="w-full px-3 py-2 border border-gray-300 rounded-lg pr-10 outline-none focus:border-blue-500"
-                      placeholder="Товары"
-                    />
-                    <div className="absolute right-2 top-1/2 -translate-y-1/2 flex items-center gap-2">
-                      <span className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs font-medium">
-                        Товары
-                        <button className="ml-1 text-blue-700 hover:text-blue-900">×</button>
-                      </span>
-                      <svg width="16" height="16" viewBox="0 0 20 20" fill="none" className="text-gray-400">
-                        <path d="M9 17C13.4183 17 17 13.4183 17 9C17 4.58172 13.4183 1 9 1C4.58172 1 1 4.58172 1 9C1 13.4183 4.58172 17 9 17Z" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                        <path d="M19 19L14.65 14.65" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="space-y-3">
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={hasOffers}
-                      onChange={(e) => setHasOffers(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700">Есть предложения</span>
-                  </label>
-                  <label className="flex items-center cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={isInDemand}
-                      onChange={(e) => setIsInDemand(e.target.checked)}
-                      className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
-                    />
-                    <span className="ml-2 text-sm text-gray-700 flex items-center gap-1">
-                      Востребованный товар
-                      <span className="text-red-500">🔥</span>
-                    </span>
-                  </label>
-                </div>
-              </div>
-            </div>
-          </aside>
-
-          <main className="flex-1">
-            <div className="bg-white rounded-lg shadow-sm p-6">
-              <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-blue-600">Товары</h2>
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center gap-2 text-sm text-gray-600">
-                    <span>Сортировка:</span>
-                    <button className="text-blue-600 hover:text-blue-700 flex items-center gap-1 bg-transparent border-none cursor-pointer">
-                      По релевантности
-                      <svg width="16" height="16" viewBox="0 0 20 20" fill="none">
-                        <path d="M5 7.5L10 12.5L15 7.5" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>
-                      </svg>
-                    </button>
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex items-center justify-between mb-6">
-                <span className="text-gray-600">Найдено: {filteredProducts.length}</span>
-                <div className="flex gap-2">
-                  <button className="p-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors bg-transparent cursor-pointer">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                      <rect x="2" y="2" width="6" height="6" stroke="currentColor" strokeWidth="2"/>
-                      <rect x="12" y="2" width="6" height="6" stroke="currentColor" strokeWidth="2"/>
-                      <rect x="2" y="12" width="6" height="6" stroke="currentColor" strokeWidth="2"/>
-                      <rect x="12" y="12" width="6" height="6" stroke="currentColor" strokeWidth="2"/>
-                    </svg>
-                  </button>
-                  <button className="p-2 border border-gray-300 rounded hover:bg-gray-50 transition-colors bg-transparent cursor-pointer">
-                    <svg width="20" height="20" viewBox="0 0 20 20" fill="none">
-                      <rect x="2" y="4" width="16" height="2" fill="currentColor"/>
-                      <rect x="2" y="9" width="16" height="2" fill="currentColor"/>
-                      <rect x="2" y="14" width="16" height="2" fill="currentColor"/>
-                    </svg>
-                  </button>
-                </div>
-              </div>
-
-              {filteredProducts.length > 0 ? (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {filteredProducts.map((product) => (
-                    <div key={product.id} className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow cursor-pointer">
-                      <div className="aspect-square bg-gray-100 flex items-center justify-center text-6xl">
-                        {product.image}
-                      </div>
-                      <div className="p-4">
-                        <div className="text-xs text-gray-500 mb-1 flex items-center gap-2">
-                          {product.brand}
-                          {product.hasOffer && (
-                            <span className="text-red-600 text-[11px] font-semibold bg-red-50 px-2 py-0.5 rounded">
-                              -10%
-                            </span>
-                          )}
-                          {product.isInDemand && (
-                            <span className="text-orange-500 text-[11px] font-semibold flex items-center gap-1">
-                              🔥 хит
-                            </span>
-                          )}
+              {/* Фильтры с бэкенда */}
+              {isLoadingFilters ? (
+                <div className="text-gray-500">Загрузка фильтров...</div>
+              ) : filters.length === 0 ? (
+                <div className="text-gray-500">Фильтры не найдены</div>
+              ) : (
+                <div className="space-y-4">
+                  {filters.map((filter: FilterOption) => (
+                    <div key={filter.id}>
+                      <h3 className="text-sm font-medium text-gray-700 mb-2">{filter.name}</h3>
+                      {filter.values && filter.values.length > 0 ? (
+                        <div className="space-y-2">
+                          {filter.values.map((value) => (
+                            <label key={value} className="flex items-center cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={selectedFilters[filter.id]?.includes(value) || false}
+                                onChange={() => handleFilterChange(filter.id, value)}
+                                className="w-4 h-4 text-blue-600 rounded focus:ring-blue-500"
+                              />
+                              <span className="ml-2 text-sm text-gray-700">{value}</span>
+                            </label>
+                          ))}
                         </div>
-                        <h3 className="text-sm font-medium text-gray-800 line-clamp-2">{product.name}</h3>
-                      </div>
+                      ) : (
+                        <div className="text-sm text-gray-500">Нет значений</div>
+                      )}
                     </div>
                   ))}
                 </div>
-              ) : (
+              )}
+
+              {/* Сброс фильтров */}
+              {(Object.keys(selectedFilters).length > 0 || searchQuery.trim()) && (
+                <button
+                  onClick={() => {
+                    setSelectedFilters({});
+                    setSearchQuery('');
+                  }}
+                  className="mt-4 w-full px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors border-none cursor-pointer text-sm"
+                >
+                  Сбросить фильтры
+                </button>
+              )}
+            </div>
+          </aside>
+
+          {/* Карточки */}
+          <main className="flex-1">
+            <div className="bg-white rounded-lg shadow-sm p-6">
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-blue-600">Карточки товаров</h2>
+                <span className="text-gray-600">
+                  Найдено: {filteredCards.length} из {cards.length}
+                </span>
+              </div>
+
+              {isLoadingResults ? (
+                <div className="text-center py-16">
+                  <svg className="animate-spin h-12 w-12 mx-auto text-blue-600" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                  </svg>
+                  <p className="mt-4 text-gray-600">Загрузка карточек...</p>
+                </div>
+              ) : resultsError ? (
+                <div className="text-center py-16">
+                  <p className="text-red-600 mb-4">Ошибка при загрузке данных</p>
+                  <button
+                    onClick={() => window.location.reload()}
+                    className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors border-none cursor-pointer"
+                  >
+                    Обновить страницу
+                  </button>
+                </div>
+              ) : filteredCards.length === 0 ? (
                 <div className="text-center py-16 border border-dashed border-gray-200 rounded-lg">
                   <p className="text-lg font-semibold text-gray-800 mb-2">Ничего не найдено</p>
-                  <p className="text-gray-500 mb-4">Попробуйте изменить запрос или сбросить фильтры</p>
+                  <p className="text-gray-500 mb-4">Попробуйте изменить фильтры или поисковый запрос</p>
                   <button
+                    onClick={() => {
+                      setSelectedFilters({});
+                      setSearchQuery('');
+                    }}
                     className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors border-none cursor-pointer"
-                    onClick={resetFilters}
                   >
                     Сбросить фильтры
                   </button>
+                </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {filteredCards.map((card: ProductCard) => (
+                    <div
+                      key={card.id}
+                      className="bg-white border border-gray-200 rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+                    >
+                      {card.image && (
+                        <div className="aspect-square bg-gray-100 flex items-center justify-center">
+                          <img
+                            src={card.image}
+                            alt={card.name || 'Карточка товара'}
+                            className="w-full h-full object-cover"
+                            onError={(e) => {
+                              e.currentTarget.style.display = 'none';
+                            }}
+                          />
+                        </div>
+                      )}
+                      <div className="p-4">
+                        <h3 className="text-lg font-medium text-gray-800 mb-2 line-clamp-2">
+                          {card.name || `Карточка ${card.id}`}
+                        </h3>
+                        {card.description && (
+                          <p className="text-sm text-gray-600 line-clamp-3 mb-3">{card.description}</p>
+                        )}
+                        {card.url && (
+                          <a
+                            href={card.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 hover:text-blue-700 text-sm font-medium"
+                          >
+                            Перейти к товару →
+                          </a>
+                        )}
+                      </div>
+                    </div>
+                  ))}
                 </div>
               )}
             </div>
           </main>
         </div>
       </div>
+
+      {/* Модальное окно регенерации */}
+      {showRegenerateModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Перегенерировать данные</h2>
+            <p className="text-gray-600 mb-4">
+              Введите строку с изменением агрегации данных:
+            </p>
+            <textarea
+              value={regenerateQuery}
+              onChange={(e) => setRegenerateQuery(e.target.value)}
+              placeholder="Например: сгруппировать по размеру и цвету"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none resize-none"
+              rows={4}
+            />
+            <div className="flex gap-4 mt-6">
+              <button
+                onClick={() => {
+                  setShowRegenerateModal(false);
+                  setRegenerateQuery('');
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors border-none cursor-pointer"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleRegenerate}
+                disabled={!regenerateQuery.trim()}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:bg-gray-400 disabled:cursor-not-allowed border-none cursor-pointer"
+              >
+                Отправить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Модальное окно рейтинга */}
+      {showRatingModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h2 className="text-2xl font-bold text-gray-800 mb-4">Оценить данные</h2>
+            <p className="text-gray-600 mb-6">
+              Выберите оценку от 1 до 5:
+            </p>
+            <div className="mb-6">
+              <input
+                type="range"
+                min="1"
+                max="5"
+                value={rating}
+                onChange={(e) => setRating(Number(e.target.value))}
+                className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer"
+              />
+              <div className="flex justify-between mt-2 text-sm text-gray-600">
+                <span>1</span>
+                <span className="text-2xl font-bold text-blue-600">{rating}</span>
+                <span>5</span>
+              </div>
+            </div>
+            <div className="flex gap-4">
+              <button
+                onClick={() => {
+                  setShowRatingModal(false);
+                  setRating(3);
+                }}
+                className="flex-1 px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 transition-colors border-none cursor-pointer"
+              >
+                Отмена
+              </button>
+              <button
+                onClick={handleRate}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors border-none cursor-pointer"
+              >
+                Отправить оценку
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };
 
 export default CatalogPage;
-
-
