@@ -100,6 +100,7 @@ public class GroupingFacadeStub implements GroupingFacade {
 
         // Перегенерируем stub-данные
         generateStubCtes(taskId);
+        groupingService.startGroupingTask(task.getId(), query);
 
         return new TaskResponse(taskId);
     }

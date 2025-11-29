@@ -1,0 +1,300 @@
+openapi: 3.0.3
+info:
+  title: CTE Grouping Service API
+  description: API для сервиса группировки товаров в Канонические Торговые Сущности (CTE/Карточки) с использованием LLM.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8080
+    description: Local Development Server
+
+paths:
+  /api/grouping/request:
+    post:
+      summary: 1) Отправка запроса на группировку СТЕ
+      description: Создает новую задачу на группировку товаров на основе текстового запроса на русском языке.
+      operationId: createGroupingTask
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  example: "Сгруппируй сантехнику по бренду и материалу"
+                  description: Текстовый запрос на группировку.
+      responses:
+        '200':
+          description: Задача успешно создана
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+
+  /api/grouping/{taskId}/results:
+    get:
+      summary: 2) Получение результатов группировки (Карточек)
+      description: Возвращает список СТЕ для указанной задачи с пагинацией и фильтрацией.
+      operationId: getGroupingResults
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID задачи группировки
+        - name: page
+          in: query
+          schema:
+            type: integer
+            default: 0
+          description: Номер страницы (начиная с 0)
+        - name: size
+          in: query
+          schema:
+            type: integer
+            default: 20
+          description: Количество элементов на странице
+        - name: filters
+          in: query
+          schema:
+            type: object
+            additionalProperties:
+              type: string
+          style: deepObject
+          explode: true
+          description: Фильтры по характеристикам (например, filters[brand]=Samsung)
+      responses:
+        '200':
+          description: Успешный ответ с результатами
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PagedCteResponse'
+
+  /api/grouping/{taskId}/filters:
+    get:
+      summary: 3) Получение доступных фильтров
+      description: Возвращает список важных характеристик, по которым была произведена группировка, для настройки фильтров на UI.
+      operationId: getGroupingFilters
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Список характеристик для фильтрации
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/FilterOption'
+
+  /api/grouping/{taskId}/regenerate:
+    post:
+      summary: 4) Перегенерация группировки
+      description: Перезапускает процесс группировки для той же задачи с уточненным запросом. Содержимое группировки на бэкенде меняется.
+      operationId: regenerateGrouping
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                query:
+                  type: string
+                  description: Уточняющий запрос на русском языке (например, "Убери цвет из важных характеристик").
+      responses:
+        '200':
+          description: Группировка перегенерирована
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TaskResponse'
+
+  /api/grouping/{taskId}/approve:
+    post:
+      summary: 5) Подтверждение группировки (Approve)
+      description: Фиксирует текущий результат группировки как финальный.
+      operationId: approveGrouping
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Группировка подтверждена
+        '404':
+          description: Задача не найдена
+
+  /api/grouping/{taskId}/rate:
+    post:
+      summary: 6) Оценка группировки
+      description: Позволяет пользователю оценить качество работы LLM по группировке товаров.
+      operationId: rateGrouping
+      parameters:
+        - name: taskId
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                rating:
+                  type: integer
+                  minimum: 1
+                  maximum: 5
+                  description: Оценка от 1 до 5
+      responses:
+        '200':
+          description: Оценка принята
+
+  /api/cte/{id}:
+    get:
+      summary: 7) Получение детальной информации об СТЕ
+      description: Возвращает полную информацию о конкретной карточке (СТ.Е), включая списки характеристик и привязанные товары.
+      operationId: getCteDetails
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+          description: ID СТЕ (Карточки)
+      responses:
+        '200':
+          description: Детальная информация об СТЕ
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CteDetail'
+        '404':
+          description: СТЕ не найдена
+
+components:
+  schemas:
+    # Ответ с ID задачи
+    TaskResponse:
+      type: object
+      properties:
+        taskId:
+          type: string
+          format: uuid
+          description: Идентификатор задачи группировки
+
+    # Краткая информация об СТЕ для списка (пункт 2)
+    CteSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        imageUrl:
+          type: string
+          format: uri
+          description: Ссылка на главное изображение группы
+          nullable: true
+        attributes:
+          type: array
+          description: Три важные характеристики для отображения в превью
+          maxItems: 3
+          items:
+            $ref: '#/components/schemas/Attribute'
+
+    # Полная информация об СТЕ (пункт 7)
+    CteDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        imageUrl:
+          type: string
+          format: uri
+        importantAttributes:
+          type: array
+          description: Список важных (определяющих) характеристик
+          items:
+            $ref: '#/components/schemas/Attribute'
+        secondaryAttributes:
+          type: array
+          description: Небольшой список неважных характеристик (доп. инфо)
+          items:
+            $ref: '#/components/schemas/Attribute'
+        productIds:
+          type: array
+          description: Список ID товаров, входящих в эту СТЕ
+          items:
+            type: integer
+            format: int64
+
+    # Характеристика (ключ-значение)
+    Attribute:
+      type: object
+      properties:
+        name:
+          type: string
+          example: "Бренд"
+        value:
+          type: string
+          example: "Samsung"
+
+    # Опция фильтра (пункт 3)
+    FilterOption:
+      type: object
+      properties:
+        key:
+          type: string
+          description: Техническое имя характеристики
+        label:
+          type: string
+          description: Отображаемое имя характеристики
+        possibleValues:
+          type: array
+          items:
+            type: string
+
+    # Пагинированный ответ (пункт 2)
+    PagedCteResponse:
+      type: object
+      properties:
+        content:
+          type: array
+          items:
+            $ref: '#/components/schemas/CteSummary'
+        totalPages:
+          type: integer
+          description: Общее количество страниц
+        totalElements:
+          type: integer
+          description: Общее количество элементов
+        size:
+          type: integer
+          description: Текущий размер страницы
+        number:
+          type: integer
+          description: Текущий номер страницы

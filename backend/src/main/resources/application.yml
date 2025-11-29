@@ -6,7 +6,7 @@ spring:
     name: cte-grouping-service
 
   datasource:
-    url: jdbc:postgresql://localhost:5432/cte_grouping
+    url: jdbc:postgresql://localhost:5432/tenderhack
     username: postgres
     password: postgres
     driver-class-name: org.postgresql.Driver
@@ -27,6 +27,11 @@ spring:
     serialization:
       write-dates-as-timestamps: false
     default-property-inclusion: non_null
+
+springdoc:
+  swagger-ui:
+    path: /api/swagger
+    url: /openapi.yaml
 
 # LLM Configuration
 llm:
