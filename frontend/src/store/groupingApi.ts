@@ -90,7 +90,6 @@ export const groupingApi = createApi({
         url: `/grouping/${taskId}/approve`,
         method: 'POST',
       }),
-      invalidatesTags: ['Grouping'],
     }),
 
     // 6. Оценка данных
@@ -100,7 +99,6 @@ export const groupingApi = createApi({
         method: 'POST',
         body,
       }),
-      invalidatesTags: ['Grouping'],
     }),
   }),
 });
