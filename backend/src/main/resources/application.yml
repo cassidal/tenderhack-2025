@@ -33,8 +33,19 @@ llm:
   url: http://localhost:11434/api/generate
   model: qwen2.5:7b
 
+# ML Service Configuration
+ml:
+  service:
+    url: http://localhost:8000
+    clustering:
+      threshold: 0.4
+
+# Ollama Configuration (for schema generation)
+ollama:
+  url: http://localhost:11434/api/generate
+  model: qwen2.5:7b
+
 logging:
   level:
     ru.tenderhack: DEBUG
-    org.hibernate.SQL: DEBUG
-
+    org.hibernate.SQL: ERROR

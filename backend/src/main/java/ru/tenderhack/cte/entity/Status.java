@@ -5,7 +5,8 @@ package ru.tenderhack.cte.entity;
  */
 public enum Status {
     PENDING,
-    PROCESSING,
+    IN_PROGRESS,
+    PROCESSING,  // Alias for IN_PROGRESS (backward compatibility)
     COMPLETED,
     APPROVED,
     FAILED

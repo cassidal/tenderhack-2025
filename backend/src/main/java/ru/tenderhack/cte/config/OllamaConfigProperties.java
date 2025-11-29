@@ -3,10 +3,10 @@ package ru.tenderhack.cte.config;
 import org.springframework.boot.context.properties.ConfigurationProperties;
 
 /**
- * Конфигурация для LLM клиента
+ * Конфигурация для Ollama
  */
-@ConfigurationProperties(prefix = "llm")
-public record LlmConfigProperties(
+@ConfigurationProperties(prefix = "ollama")
+public record OllamaConfigProperties(
         String url,
         String model
 ) {
